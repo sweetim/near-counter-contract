@@ -1,15 +1,18 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::near_bindgen;
+use near_sdk::serde::Serialize;
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize)]
+#[serde(crate = "near_sdk::serde")]
 pub enum CounterAction {
     Increment,
     Decrement,
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize)]
+#[serde(crate = "near_sdk::serde")]
 pub struct CounterRecord {
     timestamp_ms: near_sdk::Timestamp,
     user: near_sdk::AccountId,
@@ -85,12 +88,16 @@ impl Contract {
     }
 
     pub fn query_all_records(&self) -> Vec<CounterRecord> {
-        self.records.iter()
-            .collect()
+        self.records.iter().collect()
     }
 
-    pub fn query_records(&self, from_index: Option<u128>, limit: Option<u128>) -> Vec<CounterRecord> {
-        self.records.iter()
+    pub fn query_records(
+        &self,
+        from_index: Option<u128>,
+        limit: Option<u128>,
+    ) -> Vec<CounterRecord> {
+        self.records
+            .iter()
             .skip(from_index.unwrap_or_default() as usize)
             .take(limit.unwrap_or(10) as usize)
             .collect()
@@ -130,7 +137,6 @@ mod tests {
     #[test]
     fn calculate_value_decrement_no_overflow() {
         assert_eq!(0, Contract::calculate_value(0, &CounterAction::Decrement));
-
         assert_eq!(0, Contract::calculate_value(0, &CounterAction::Decrement));
     }
 
