@@ -84,15 +84,21 @@ impl Contract {
         self.value
     }
 
-    pub fn get_all_records(&self) -> Vec<CounterRecord> {
-        self.records.iter().collect()
+    pub fn query_all_records(&self) -> Vec<CounterRecord> {
+        self.records.iter()
+            .collect()
+    }
+
+    pub fn query_records(&self, from_index: Option<u128>, limit: Option<u128>) -> Vec<CounterRecord> {
+        self.records.iter()
+            .skip(from_index.unwrap_or_default() as usize)
+            .take(limit.unwrap_or(10) as usize)
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use near_sdk::store::vec;
-
     use super::*;
 
     fn set_context(account_id: Option<&str>, amount: Option<near_sdk::Balance>) {
@@ -198,29 +204,29 @@ mod tests {
     }
 
     #[test]
-    fn get_all_records_default() {
+    fn query_all_records_default() {
         let contract = Contract::default();
 
-        assert_eq!(0, contract.get_all_records().len());
+        assert_eq!(0, contract.query_all_records().len());
     }
 
     #[test]
-    fn get_all_records() {
+    fn query_all_records() {
         let mut contract = Contract::default();
 
         set_context(Some("user_1"), None);
         contract.increment();
-        let records = contract.get_all_records();
+        let records = contract.query_all_records();
         assert_eq!(1, records.len());
 
         set_context(Some("user_2"), None);
         contract.increment();
-        let records = contract.get_all_records();
+        let records = contract.query_all_records();
         assert_eq!(2, records.len());
 
         set_context(Some("user_1"), None);
         contract.decrement();
-        let records = contract.get_all_records();
+        let records = contract.query_all_records();
         assert_eq!(3, records.len());
     }
 }
