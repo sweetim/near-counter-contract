@@ -1,5 +1,5 @@
-use near_sdk::{near_bindgen};
-use near_sdk::borsh::{self, BorshSerialize, BorshDeserialize};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::near_bindgen;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -13,21 +13,21 @@ pub enum CounterAction {
 pub struct CounterRecord {
     timestamp_ms: near_sdk::Timestamp,
     user: near_sdk::AccountId,
-    action: CounterAction
+    action: CounterAction,
 }
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
     value: u128,
-    records: near_sdk::collections::Vector<CounterRecord>
+    records: near_sdk::collections::Vector<CounterRecord>,
 }
 
 impl Default for Contract {
     fn default() -> Self {
         Self {
             value: 0,
-            records: near_sdk::collections::Vector::new(b"r")
+            records: near_sdk::collections::Vector::new(b"r"),
         }
     }
 }
@@ -38,44 +38,46 @@ pub const STORAGE_FEE: u128 = 1_000_000_000_000_000_000_000;
 impl Contract {
     #[payable]
     pub fn increment(&mut self) -> u128 {
+        self.perform_action(CounterAction::Increment)
+    }
+
+    #[payable]
+    pub fn decrement(&mut self) -> u128 {
+        self.perform_action(CounterAction::Decrement)
+    }
+
+    fn perform_action(&mut self, action: CounterAction) -> u128 {
         let user = near_sdk::env::signer_account_id();
         let fee = near_sdk::env::attached_deposit();
         let is_fee_sufficient = fee > STORAGE_FEE;
 
         near_sdk::require!(
             is_fee_sufficient,
-            format!("insufficient near, please attach at least {STORAGE_FEE}"));
+            format!("insufficient near, please attach at least {STORAGE_FEE}")
+        );
 
-        self.value += 1;
+        self.value = Self::calculate_value(self.value, &action);
+
         self.records.push(&CounterRecord {
-            action: CounterAction::Increment,
+            action,
             timestamp_ms: near_sdk::env::block_timestamp_ms(),
-            user
+            user,
         });
 
         self.value
     }
 
-    #[payable]
-    pub fn decrement(&mut self) -> u128 {
-        let user = near_sdk::env::signer_account_id();
-        let fee = near_sdk::env::attached_deposit();
-        let is_fee_sufficient = fee > STORAGE_FEE;
-
-        near_sdk::require!(
-            is_fee_sufficient,
-            format!("insufficient near, please attach at least {STORAGE_FEE}"));
-
-        if self.value > 0 {
-            self.value -= 1;
-            self.records.push(&CounterRecord {
-                action: CounterAction::Increment,
-                timestamp_ms: near_sdk::env::block_timestamp_ms(),
-                user
-            });
+    fn calculate_value(input: u128, action: &CounterAction) -> u128 {
+        match action {
+            CounterAction::Increment => input + 1,
+            CounterAction::Decrement => {
+                if input > 0 {
+                    input - 1
+                } else {
+                    0
+                }
+            }
         }
-
-        self.value
     }
 
     pub fn get_value(&self) -> u128 {
@@ -83,19 +85,20 @@ impl Contract {
     }
 
     pub fn get_all_records(&self) -> Vec<CounterRecord> {
-        self.records
-            .iter()
-            .collect()
+        self.records.iter().collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use near_sdk::store::vec;
+
     use super::*;
 
-    fn set_context(amount: Option<near_sdk::Balance>) {
+    fn set_context(account_id: Option<&str>, amount: Option<near_sdk::Balance>) {
         let context = near_sdk::test_utils::VMContextBuilder::new()
             .attached_deposit(amount.unwrap_or(1) * near_sdk::ONE_NEAR)
+            .signer_account_id(account_id.unwrap_or("default.test").parse().unwrap())
             .build();
 
         near_sdk::testing_env!(context)
@@ -109,8 +112,25 @@ mod tests {
     }
 
     #[test]
+    fn calculate_value_increment() {
+        assert_eq!(11, Contract::calculate_value(10, &CounterAction::Increment));
+    }
+
+    #[test]
+    fn calculate_value_decrement() {
+        assert_eq!(9, Contract::calculate_value(10, &CounterAction::Decrement));
+    }
+
+    #[test]
+    fn calculate_value_decrement_no_overflow() {
+        assert_eq!(0, Contract::calculate_value(0, &CounterAction::Decrement));
+
+        assert_eq!(0, Contract::calculate_value(0, &CounterAction::Decrement));
+    }
+
+    #[test]
     fn increment() {
-        set_context(None);
+        set_context(None, None);
 
         let mut contract = Contract::default();
         assert_eq!(0, contract.get_value());
@@ -128,7 +148,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn increment_panic_when_insufficient() {
-        set_context(Some(0));
+        set_context(None, Some(0));
 
         let mut contract = Contract::default();
         contract.increment();
@@ -136,7 +156,7 @@ mod tests {
 
     #[test]
     fn decrement() {
-        set_context(None);
+        set_context(None, None);
 
         let mut contract = Contract::default();
         assert_eq!(0, contract.get_value());
@@ -157,7 +177,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn decrement_panic_when_insufficient() {
-        set_context(Some(0));
+        set_context(None, Some(0));
 
         let mut contract = Contract::default();
         contract.decrement();
@@ -165,7 +185,7 @@ mod tests {
 
     #[test]
     fn decrement_no_overflow() {
-        set_context(None);
+        set_context(None, None);
 
         let mut contract = Contract::default();
         assert_eq!(0, contract.get_value());
@@ -182,5 +202,25 @@ mod tests {
         let contract = Contract::default();
 
         assert_eq!(0, contract.get_all_records().len());
+    }
+
+    #[test]
+    fn get_all_records() {
+        let mut contract = Contract::default();
+
+        set_context(Some("user_1"), None);
+        contract.increment();
+        let records = contract.get_all_records();
+        assert_eq!(1, records.len());
+
+        set_context(Some("user_2"), None);
+        contract.increment();
+        let records = contract.get_all_records();
+        assert_eq!(2, records.len());
+
+        set_context(Some("user_1"), None);
+        contract.decrement();
+        let records = contract.get_all_records();
+        assert_eq!(3, records.len());
     }
 }
