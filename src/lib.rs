@@ -1,9 +1,10 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::json_types::U128;
 use near_sdk::near_bindgen;
 use near_sdk::serde::Serialize;
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, Serialize)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Debug, PartialEq)]
 #[serde(crate = "near_sdk::serde")]
 pub enum CounterAction {
     Increment,
@@ -11,7 +12,7 @@ pub enum CounterAction {
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, Serialize)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Debug, PartialEq)]
 #[serde(crate = "near_sdk::serde")]
 pub struct CounterRecord {
     timestamp_ms: near_sdk::Timestamp,
@@ -40,13 +41,13 @@ pub const STORAGE_FEE: u128 = 1_000_000_000_000_000_000_000;
 #[near_bindgen]
 impl Contract {
     #[payable]
-    pub fn increment(&mut self) -> u128 {
-        self.perform_action(CounterAction::Increment)
+    pub fn increment(&mut self) -> U128 {
+        U128(self.perform_action(CounterAction::Increment))
     }
 
     #[payable]
-    pub fn decrement(&mut self) -> u128 {
-        self.perform_action(CounterAction::Decrement)
+    pub fn decrement(&mut self) -> U128 {
+        U128(self.perform_action(CounterAction::Decrement))
     }
 
     fn perform_action(&mut self, action: CounterAction) -> u128 {
@@ -83,8 +84,8 @@ impl Contract {
         }
     }
 
-    pub fn get_value(&self) -> u128 {
-        self.value
+    pub fn get_value(&self) -> U128 {
+        U128(self.value)
     }
 
     pub fn query_all_records(&self) -> Vec<CounterRecord> {
@@ -93,13 +94,13 @@ impl Contract {
 
     pub fn query_records(
         &self,
-        from_index: Option<u128>,
-        limit: Option<u128>,
+        from_index: Option<U128>,
+        limit: Option<U128>,
     ) -> Vec<CounterRecord> {
         self.records
             .iter()
-            .skip(from_index.unwrap_or_default() as usize)
-            .take(limit.unwrap_or(10) as usize)
+            .skip(from_index.unwrap_or(U128(0)).0 as usize)
+            .take(limit.unwrap_or(U128(10)).0 as usize)
             .collect()
     }
 }
@@ -121,7 +122,7 @@ mod tests {
     fn get_count() {
         let contract = Contract::default();
 
-        assert_eq!(0, contract.get_value());
+        assert_eq!(U128(0), contract.get_value());
     }
 
     #[test]
@@ -145,16 +146,16 @@ mod tests {
         set_context(None, None);
 
         let mut contract = Contract::default();
-        assert_eq!(0, contract.get_value());
+        assert_eq!(U128(0), contract.get_value());
 
         contract.increment();
-        assert_eq!(1, contract.get_value());
+        assert_eq!(U128(1), contract.get_value());
 
         contract.increment();
-        assert_eq!(2, contract.get_value());
+        assert_eq!(U128(2), contract.get_value());
 
         contract.increment();
-        assert_eq!(3, contract.get_value());
+        assert_eq!(U128(3), contract.get_value());
     }
 
     #[test]
@@ -171,19 +172,19 @@ mod tests {
         set_context(None, None);
 
         let mut contract = Contract::default();
-        assert_eq!(0, contract.get_value());
+        assert_eq!(U128(0), contract.get_value());
 
         contract.increment();
         contract.increment();
         contract.increment();
 
-        assert_eq!(3, contract.get_value());
+        assert_eq!(U128(3), contract.get_value());
 
         contract.decrement();
-        assert_eq!(2, contract.get_value());
+        assert_eq!(U128(2), contract.get_value());
 
         contract.decrement();
-        assert_eq!(1, contract.get_value());
+        assert_eq!(U128(1), contract.get_value());
     }
 
     #[test]
@@ -200,13 +201,13 @@ mod tests {
         set_context(None, None);
 
         let mut contract = Contract::default();
-        assert_eq!(0, contract.get_value());
+        assert_eq!(U128(0), contract.get_value());
 
         contract.decrement();
         contract.decrement();
         contract.decrement();
 
-        assert_eq!(0, contract.get_value());
+        assert_eq!(U128(0), contract.get_value());
     }
 
     #[test]
@@ -222,17 +223,35 @@ mod tests {
 
         set_context(Some("user_1"), None);
         contract.increment();
-        let records = contract.query_all_records();
-        assert_eq!(1, records.len());
+        assert_eq!(1, contract.query_all_records().len());
 
         set_context(Some("user_2"), None);
         contract.increment();
-        let records = contract.query_all_records();
-        assert_eq!(2, records.len());
+        assert_eq!(2, contract.query_all_records().len());
 
         set_context(Some("user_1"), None);
         contract.decrement();
-        let records = contract.query_all_records();
-        assert_eq!(3, records.len());
+        assert_eq!(3, contract.query_all_records().len());
+
+        assert_eq!(
+            vec![
+                CounterRecord {
+                    action: CounterAction::Increment,
+                    timestamp_ms: 0,
+                    user: "user_1".parse().unwrap()
+                },
+                CounterRecord {
+                    action: CounterAction::Increment,
+                    timestamp_ms: 0,
+                    user: "user_2".parse().unwrap()
+                },
+                CounterRecord {
+                    action: CounterAction::Decrement,
+                    timestamp_ms: 0,
+                    user: "user_1".parse().unwrap()
+                }
+            ],
+            contract.query_all_records()
+        );
     }
 }
