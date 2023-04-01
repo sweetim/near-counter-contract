@@ -1,2 +1,6 @@
+[alias]
+build-release = "build --target wasm32-unknown-unknown --release"
+test-coverage = "llvm-cov --lcov --output-path lcov.info"
+
 [build]
 rustflags = ["-C", "link-arg=-s"]
