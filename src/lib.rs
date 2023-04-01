@@ -42,15 +42,15 @@ pub const STORAGE_FEE: u128 = 1_000_000_000_000_000_000_000;
 impl Contract {
     #[payable]
     pub fn increment(&mut self) -> U128 {
-        U128(self.perform_action(CounterAction::Increment))
+        self.perform_action(CounterAction::Increment)
     }
 
     #[payable]
     pub fn decrement(&mut self) -> U128 {
-        U128(self.perform_action(CounterAction::Decrement))
+        self.perform_action(CounterAction::Decrement)
     }
 
-    fn perform_action(&mut self, action: CounterAction) -> u128 {
+    fn perform_action(&mut self, action: CounterAction) -> U128 {
         let user = near_sdk::env::signer_account_id();
         let fee = near_sdk::env::attached_deposit();
         let is_fee_sufficient = fee > STORAGE_FEE;
@@ -68,7 +68,7 @@ impl Contract {
             user,
         });
 
-        self.value
+        U128(self.value)
     }
 
     fn calculate_value(input: u128, action: &CounterAction) -> u128 {
@@ -106,7 +106,7 @@ impl Contract {
 }
 
 #[cfg(test)]
-mod tests {
+mod contract_tests {
     use super::*;
 
     fn set_context(account_id: Option<&str>, amount: Option<near_sdk::Balance>) {
@@ -252,6 +252,47 @@ mod tests {
                 }
             ],
             contract.query_all_records()
+        );
+    }
+
+    #[test]
+    fn query_records() {
+        let mut contract = Contract::default();
+
+        set_context(Some("user_1"), None);
+        contract.increment();
+        set_context(Some("user_2"), None);
+        contract.increment();
+        set_context(Some("user_1"), None);
+        contract.decrement();
+
+        let records = contract.query_records(Some(U128(1)), None);
+        assert_eq!(
+            records,
+            vec![
+                CounterRecord {
+                    action: CounterAction::Increment,
+                    timestamp_ms: 0,
+                    user: "user_2".parse().unwrap()
+                },
+                CounterRecord {
+                    action: CounterAction::Decrement,
+                    timestamp_ms: 0,
+                    user: "user_1".parse().unwrap()
+                }
+            ],
+        );
+
+        let records = contract.query_records(Some(U128(1)), Some(U128(1)));
+        assert_eq!(
+            records,
+            vec![
+                CounterRecord {
+                    action: CounterAction::Increment,
+                    timestamp_ms: 0,
+                    user: "user_2".parse().unwrap()
+                }
+            ],
         );
     }
 }
