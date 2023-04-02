@@ -73,7 +73,13 @@ impl Contract {
 
     fn calculate_value(input: u128, action: &CounterAction) -> u128 {
         match action {
-            CounterAction::Increment => input + 1,
+            CounterAction::Increment => {
+                if input < u128::MAX {
+                    input + 1
+                } else {
+                    input
+                }
+            },
             CounterAction::Decrement => {
                 if input > 0 {
                     input - 1
@@ -156,6 +162,22 @@ mod contract_tests {
 
         contract.increment();
         assert_eq!(U128(3), contract.get_value());
+    }
+
+    #[test]
+    fn increment_no_overflow() {
+        set_context(None, None);
+
+        let mut contract = Contract::default();
+        contract.value = u128::MAX;
+
+        assert_eq!(U128(u128::MAX), contract.get_value());
+
+        contract.increment();
+        contract.increment();
+        contract.increment();
+
+        assert_eq!(U128(u128::MAX), contract.get_value());
     }
 
     #[test]
