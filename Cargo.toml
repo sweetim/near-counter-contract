@@ -1,5 +1,5 @@
 [package]
-name = "near-counter-dapp"
+name = "near-counter-contract"
 version = "0.1.0"
 edition = "2021"
 
