@@ -81,7 +81,7 @@ impl Contract {
                 }
             },
             CounterAction::Decrement => {
-                if input > 0 {
+                if input > u128::MIN {
                     input - 1
                 } else {
                     0
@@ -94,8 +94,12 @@ impl Contract {
         U128(self.value)
     }
 
+    pub fn get_records_length(&self) -> u64 {
+        self.records.len()
+    }
+
     pub fn query_all_records(&self) -> Vec<CounterRecord> {
-        self.records.iter().collect()
+        self.query_records(Some(U128(0)), Some(U128(u128::MAX)))
     }
 
     pub fn query_records(
@@ -105,6 +109,7 @@ impl Contract {
     ) -> Vec<CounterRecord> {
         self.records
             .iter()
+            .rev()
             .skip(from_index.unwrap_or(U128(0)).0 as usize)
             .take(limit.unwrap_or(U128(10)).0 as usize)
             .collect()
@@ -236,6 +241,7 @@ mod contract_tests {
     fn query_all_records_default() {
         let contract = Contract::default();
 
+        assert_eq!(0, contract.get_records_length());
         assert_eq!(0, contract.query_all_records().len());
     }
 
@@ -255,10 +261,11 @@ mod contract_tests {
         contract.decrement();
         assert_eq!(3, contract.query_all_records().len());
 
+        assert_eq!(3, contract.get_records_length());
         assert_eq!(
             vec![
                 CounterRecord {
-                    action: CounterAction::Increment,
+                    action: CounterAction::Decrement,
                     timestamp_ms: 0,
                     user: "user_1".parse().unwrap()
                 },
@@ -268,10 +275,10 @@ mod contract_tests {
                     user: "user_2".parse().unwrap()
                 },
                 CounterRecord {
-                    action: CounterAction::Decrement,
+                    action: CounterAction::Increment,
                     timestamp_ms: 0,
                     user: "user_1".parse().unwrap()
-                }
+                },
             ],
             contract.query_all_records()
         );
@@ -298,10 +305,10 @@ mod contract_tests {
                     user: "user_2".parse().unwrap()
                 },
                 CounterRecord {
-                    action: CounterAction::Decrement,
+                    action: CounterAction::Increment,
                     timestamp_ms: 0,
                     user: "user_1".parse().unwrap()
-                }
+                },
             ],
         );
 
