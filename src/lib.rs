@@ -263,6 +263,7 @@ mod contract_tests {
 
         assert_eq!(3, contract.get_records_length());
         assert_eq!(
+            contract.query_all_records(),
             vec![
                 CounterRecord {
                     action: CounterAction::Decrement,
@@ -279,8 +280,7 @@ mod contract_tests {
                     timestamp_ms: 0,
                     user: "user_1".parse().unwrap()
                 },
-            ],
-            contract.query_all_records()
+            ]
         );
     }
 
@@ -295,9 +295,8 @@ mod contract_tests {
         set_context(Some("user_1"), None);
         contract.decrement();
 
-        let records = contract.query_records(Some(U128(1)), None);
         assert_eq!(
-            records,
+            contract.query_records(Some(U128(1)), None),
             vec![
                 CounterRecord {
                     action: CounterAction::Increment,
@@ -312,9 +311,8 @@ mod contract_tests {
             ],
         );
 
-        let records = contract.query_records(Some(U128(1)), Some(U128(1)));
         assert_eq!(
-            records,
+            contract.query_records(Some(U128(1)), Some(U128(1))),
             vec![
                 CounterRecord {
                     action: CounterAction::Increment,
