@@ -36,7 +36,7 @@ impl Default for Contract {
     }
 }
 
-pub const STORAGE_FEE: u128 = 1_000_000_000_000_000_000_000;
+pub const COUNTER_ENTRY_FEE: u128 = 1_000_000_000_000_000_000_000;
 
 #[near_bindgen]
 impl Contract {
@@ -53,11 +53,11 @@ impl Contract {
     fn perform_action(&mut self, action: CounterAction) -> U128 {
         let user = near_sdk::env::signer_account_id();
         let fee = near_sdk::env::attached_deposit();
-        let is_fee_sufficient = fee > STORAGE_FEE;
+        let is_fee_sufficient = fee > COUNTER_ENTRY_FEE;
 
         near_sdk::require!(
             is_fee_sufficient,
-            format!("insufficient near, please attach at least {STORAGE_FEE}")
+            format!("insufficient near, please attach at least {COUNTER_ENTRY_FEE}")
         );
 
         self.value = Self::calculate_value(self.value, &action);
@@ -87,7 +87,7 @@ impl Contract {
     }
 
     pub fn query_all_records(&self) -> Vec<CounterRecord> {
-        self.query_records(Some(U128(0)), Some(U128(u128::MAX)))
+        self.query_records(None, None)
     }
 
     pub fn query_records(
@@ -99,7 +99,7 @@ impl Contract {
             .iter()
             .rev()
             .skip(from_index.unwrap_or(U128(0)).0 as usize)
-            .take(limit.unwrap_or(U128(10)).0 as usize)
+            .take(limit.unwrap_or(U128(u128::MAX)).0 as usize)
             .collect()
     }
 }
