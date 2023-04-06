@@ -73,20 +73,8 @@ impl Contract {
 
     fn calculate_value(input: u128, action: &CounterAction) -> u128 {
         match action {
-            CounterAction::Increment => {
-                if input < u128::MAX {
-                    input + 1
-                } else {
-                    input
-                }
-            },
-            CounterAction::Decrement => {
-                if input > u128::MIN {
-                    input - 1
-                } else {
-                    0
-                }
-            }
+            CounterAction::Increment => input.checked_add(1).unwrap_or(input),
+            CounterAction::Decrement => input.checked_sub(1).unwrap_or(0)
         }
     }
 
@@ -120,10 +108,10 @@ impl Contract {
 mod contract_tests {
     use super::*;
 
-    fn set_context(account_id: Option<&str>, amount: Option<near_sdk::Balance>) {
+    fn set_context(account_id: Option<near_sdk::AccountId>, amount: Option<near_sdk::Balance>) {
         let context = near_sdk::test_utils::VMContextBuilder::new()
             .attached_deposit(amount.unwrap_or(1) * near_sdk::ONE_NEAR)
-            .signer_account_id(account_id.unwrap_or("default.test").parse().unwrap())
+            .signer_account_id(account_id.unwrap_or(near_sdk::test_utils::accounts(0)))
             .build();
 
         near_sdk::testing_env!(context)
@@ -249,15 +237,15 @@ mod contract_tests {
     fn query_all_records() {
         let mut contract = Contract::default();
 
-        set_context(Some("user_1"), None);
+        set_context(Some(near_sdk::test_utils::accounts(1)), None);
         contract.increment();
         assert_eq!(1, contract.query_all_records().len());
 
-        set_context(Some("user_2"), None);
+        set_context(Some(near_sdk::test_utils::accounts(2)), None);
         contract.increment();
         assert_eq!(2, contract.query_all_records().len());
 
-        set_context(Some("user_1"), None);
+        set_context(Some(near_sdk::test_utils::accounts(1)), None);
         contract.decrement();
         assert_eq!(3, contract.query_all_records().len());
 
@@ -268,17 +256,17 @@ mod contract_tests {
                 CounterRecord {
                     action: CounterAction::Decrement,
                     timestamp_ms: 0,
-                    user: "user_1".parse().unwrap()
+                    user: near_sdk::test_utils::accounts(1)
                 },
                 CounterRecord {
                     action: CounterAction::Increment,
                     timestamp_ms: 0,
-                    user: "user_2".parse().unwrap()
+                    user: near_sdk::test_utils::accounts(2)
                 },
                 CounterRecord {
                     action: CounterAction::Increment,
                     timestamp_ms: 0,
-                    user: "user_1".parse().unwrap()
+                    user: near_sdk::test_utils::accounts(1)
                 },
             ]
         );
@@ -288,11 +276,11 @@ mod contract_tests {
     fn query_records() {
         let mut contract = Contract::default();
 
-        set_context(Some("user_1"), None);
+        set_context(Some(near_sdk::test_utils::accounts(1)), None);
         contract.increment();
-        set_context(Some("user_2"), None);
+        set_context(Some(near_sdk::test_utils::accounts(2)), None);
         contract.increment();
-        set_context(Some("user_1"), None);
+        set_context(Some(near_sdk::test_utils::accounts(1)), None);
         contract.decrement();
 
         assert_eq!(
@@ -301,12 +289,12 @@ mod contract_tests {
                 CounterRecord {
                     action: CounterAction::Increment,
                     timestamp_ms: 0,
-                    user: "user_2".parse().unwrap()
+                    user: near_sdk::test_utils::accounts(2)
                 },
                 CounterRecord {
                     action: CounterAction::Increment,
                     timestamp_ms: 0,
-                    user: "user_1".parse().unwrap()
+                    user: near_sdk::test_utils::accounts(1)
                 },
             ],
         );
@@ -317,7 +305,7 @@ mod contract_tests {
                 CounterRecord {
                     action: CounterAction::Increment,
                     timestamp_ms: 0,
-                    user: "user_2".parse().unwrap()
+                    user: near_sdk::test_utils::accounts(2)
                 }
             ],
         );
