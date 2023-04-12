@@ -9,6 +9,7 @@ use near_sdk::serde::Serialize;
 pub enum CounterAction {
     Increment,
     Decrement,
+    Random
 }
 
 #[near_bindgen]
@@ -36,7 +37,7 @@ impl Default for Contract {
     }
 }
 
-pub const COUNTER_ENTRY_FEE: u128 = 1_000_000_000_000_000_000_000;
+pub const COUNTER_ENTRY_FEE: u128 = 10_000_000_000_000_000_000_000;
 
 #[near_bindgen]
 impl Contract {
@@ -50,10 +51,15 @@ impl Contract {
         self.perform_action(CounterAction::Decrement)
     }
 
+    #[payable]
+    pub fn random(&mut self) -> U128 {
+        self.perform_action(CounterAction::Random)
+    }
+
     fn perform_action(&mut self, action: CounterAction) -> U128 {
         let user = near_sdk::env::signer_account_id();
         let fee = near_sdk::env::attached_deposit();
-        let is_fee_sufficient = fee > COUNTER_ENTRY_FEE;
+        let is_fee_sufficient = fee >= COUNTER_ENTRY_FEE;
 
         near_sdk::require!(
             is_fee_sufficient,
@@ -74,8 +80,20 @@ impl Contract {
     fn calculate_value(input: u128, action: &CounterAction) -> u128 {
         match action {
             CounterAction::Increment => input.checked_add(1).unwrap_or(input),
-            CounterAction::Decrement => input.checked_sub(1).unwrap_or(0)
+            CounterAction::Decrement => input.checked_sub(1).unwrap_or(0),
+            CounterAction::Random => {
+                let random_action = match near_sdk::env::random_seed().get(0).unwrap() % 2 == 0 {
+                    true => CounterAction::Increment,
+                    false => CounterAction::Decrement
+                };
+
+                Self::calculate_value(input, &random_action)
+            }
         }
+    }
+
+    pub fn get_entry_fee(&self) -> U128 {
+        U128(COUNTER_ENTRY_FEE)
     }
 
     pub fn get_value(&self) -> U128 {
@@ -138,6 +156,12 @@ mod contract_tests {
     fn calculate_value_decrement_no_overflow() {
         assert_eq!(0, Contract::calculate_value(0, &CounterAction::Decrement));
         assert_eq!(0, Contract::calculate_value(0, &CounterAction::Decrement));
+    }
+
+    #[test]
+    fn calculate_value_random() {
+        assert_eq!(11, Contract::calculate_value(10, &CounterAction::Random));
+        assert_eq!(12, Contract::calculate_value(11, &CounterAction::Random));
     }
 
     #[test]
@@ -245,7 +269,7 @@ mod contract_tests {
         contract.increment();
         assert_eq!(2, contract.query_all_records().len());
 
-        set_context(Some(near_sdk::test_utils::accounts(1)), None);
+        set_context(Some(near_sdk::test_utils::accounts(3)), None);
         contract.decrement();
         assert_eq!(3, contract.query_all_records().len());
 
@@ -256,7 +280,7 @@ mod contract_tests {
                 CounterRecord {
                     action: CounterAction::Decrement,
                     timestamp_ms: 0,
-                    user: near_sdk::test_utils::accounts(1)
+                    user: near_sdk::test_utils::accounts(3)
                 },
                 CounterRecord {
                     action: CounterAction::Increment,
@@ -280,7 +304,7 @@ mod contract_tests {
         contract.increment();
         set_context(Some(near_sdk::test_utils::accounts(2)), None);
         contract.increment();
-        set_context(Some(near_sdk::test_utils::accounts(1)), None);
+        set_context(Some(near_sdk::test_utils::accounts(3)), None);
         contract.decrement();
 
         assert_eq!(
