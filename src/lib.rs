@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
-use near_sdk::near_bindgen;
-use near_sdk::serde::Serialize;
+use near_sdk::{near_bindgen};
+use near_sdk::serde::{Serialize, Deserialize};
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Debug, PartialEq)]
@@ -38,6 +38,33 @@ impl Default for Contract {
 }
 
 pub const COUNTER_ENTRY_FEE: u128 = 10_000_000_000_000_000_000_000;
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct CounterEventLog {
+    pub version: String,
+    pub event: String,
+    pub data: String,
+}
+
+impl std::fmt::Display for CounterEventLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "EVENT_JSON:{}",
+            &near_sdk::serde_json::to_string(self).map_err(|_| std::fmt::Error)?
+        ))
+    }
+}
+
+impl CounterEventLog {
+    fn create(text: &str) -> Self {
+        Self {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            event: "perform_action".to_string(),
+            data: text.to_string(),
+        }
+    }
+}
 
 #[near_bindgen]
 impl Contract {
@@ -78,6 +105,8 @@ impl Contract {
     }
 
     fn calculate_value(input: u128, action: &CounterAction) -> u128 {
+        near_sdk::log!(CounterEventLog::create(&format!("perform action ({:?})", action)).to_string());
+
         match action {
             CounterAction::Increment => input.checked_add(1).unwrap_or(input),
             CounterAction::Decrement => input.checked_sub(1).unwrap_or(0),
