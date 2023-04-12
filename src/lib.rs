@@ -94,6 +94,7 @@ impl Contract {
         );
 
         self.value = Self::calculate_value(self.value, &action);
+        near_sdk::log!(CounterEventLog::create(&format!("perform action ({:?}) = {}", action, self.value)).to_string());
 
         self.records.push(&CounterRecord {
             action,
@@ -105,8 +106,6 @@ impl Contract {
     }
 
     fn calculate_value(input: u128, action: &CounterAction) -> u128 {
-        near_sdk::log!(CounterEventLog::create(&format!("perform action ({:?})", action)).to_string());
-
         match action {
             CounterAction::Increment => input.checked_add(1).unwrap_or(input),
             CounterAction::Decrement => input.checked_sub(1).unwrap_or(0),
