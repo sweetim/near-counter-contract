@@ -18,11 +18,11 @@ impl std::fmt::Display for CounterEventLog {
 }
 
 impl CounterEventLog {
-    pub fn create(text: &str) -> Self {
+    pub fn create(action: &crate::CounterAction, value: u128) -> Self {
         Self {
             version: env!("CARGO_PKG_VERSION").to_string(),
             event: "perform_action".to_string(),
-            data: text.to_string(),
+            data: format!("perform action ({:?}) = {}", action, value).to_string(),
         }
     }
 }

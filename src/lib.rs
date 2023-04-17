@@ -1,7 +1,7 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::near_bindgen;
 use near_sdk::json_types::U128;
-use near_sdk::{near_bindgen};
-use near_sdk::serde::{Serialize};
+use near_sdk::serde::Serialize;
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 
 mod events;
 
@@ -11,7 +11,7 @@ mod events;
 pub enum CounterAction {
     Increment,
     Decrement,
-    Random
+    Random,
 }
 
 #[near_bindgen]
@@ -69,7 +69,7 @@ impl Contract {
         );
 
         self.value = Self::calculate_value(self.value, &action);
-        near_sdk::log!(events::CounterEventLog::create(&format!("perform action ({:?}) = {}", action, self.value)).to_string());
+        near_sdk::log!(events::CounterEventLog::create(&action, self.value).to_string());
 
         self.records.push(&CounterRecord {
             action,
@@ -85,10 +85,15 @@ impl Contract {
             CounterAction::Increment => input.checked_add(1).unwrap_or(input),
             CounterAction::Decrement => input.checked_sub(1).unwrap_or(0),
             CounterAction::Random => {
-                let random_action = match near_sdk::env::random_seed().get(0).unwrap() % 2 == 0 {
-                    true => CounterAction::Increment,
-                    false => CounterAction::Decrement
-                };
+                let random_action = near_sdk::env::random_seed()
+                    .into_iter()
+                    .reduce(|acc, item| acc ^ item)
+                    .map(|item| item % 2 == 0)
+                    .map(|item| match item {
+                        true => CounterAction::Increment,
+                        false => CounterAction::Decrement
+                    })
+                    .unwrap();
 
                 Self::calculate_value(input, &random_action)
             }
