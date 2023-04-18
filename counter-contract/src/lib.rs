@@ -1,4 +1,4 @@
-use near_sdk::{near_bindgen, BorshStorageKey};
+use near_sdk::{near_bindgen, BorshStorageKey, ext_contract};
 use near_sdk::json_types::U128;
 use near_sdk::serde::Serialize;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
@@ -46,24 +46,27 @@ impl Default for Contract {
 
 pub const COUNTER_ENTRY_FEE: u128 = 10_000_000_000_000_000_000_000;
 
+const MIN_GAS_FEE: near_sdk::Gas = near_sdk::Gas(10_000_000_000_000);
+const TOKEN_CONTRACT_ID: &str = "dev-1681832116683-59715775518634";
+
 #[near_bindgen]
 impl Contract {
     #[payable]
-    pub fn increment(&mut self) -> U128 {
-        self.perform_action(CounterAction::Increment)
+    pub fn increment(&mut self) {
+        self.perform_action(CounterAction::Increment);
     }
 
     #[payable]
-    pub fn decrement(&mut self) -> U128 {
+    pub fn decrement(&mut self) {
         self.perform_action(CounterAction::Decrement)
     }
 
     #[payable]
-    pub fn random(&mut self) -> U128 {
+    pub fn random(&mut self) {
         self.perform_action(CounterAction::Random)
     }
 
-    fn perform_action(&mut self, action: CounterAction) -> U128 {
+    fn perform_action(&mut self, action: CounterAction) {
         let user = near_sdk::env::signer_account_id();
         let fee = near_sdk::env::attached_deposit();
         let is_fee_sufficient = fee >= COUNTER_ENTRY_FEE;
@@ -82,7 +85,40 @@ impl Contract {
             user,
         });
 
-        U128(self.value)
+        ext_counter_ft::ext(TOKEN_CONTRACT_ID.parse().unwrap())
+            .with_static_gas(MIN_GAS_FEE)
+            .with_attached_deposit(near_sdk::env::attached_deposit())
+            .storage_deposit(Some(near_sdk::env::signer_account_id()), Some(true))
+            .then(
+                Self::ext(near_sdk::env::current_account_id())
+                    .with_static_gas(MIN_GAS_FEE)
+                    .callback_storage_deposit()
+            );
+    }
+
+    #[private]
+    pub fn callback_storage_deposit(#[callback_result] res: Result<near_contract_standards::storage_management::StorageBalance, near_sdk::PromiseError>) {
+        if res.is_err() {
+            near_sdk::env::panic_str("failed to call storage_deposit");
+        } else {
+            ext_counter_ft::ext(TOKEN_CONTRACT_ID.parse().unwrap())
+                .with_static_gas(MIN_GAS_FEE)
+                .ft_mint()
+                .then(
+                    Self::ext(near_sdk::env::current_account_id())
+                        .with_static_gas(MIN_GAS_FEE)
+                        .callback_ft_mint()
+                );
+        }
+    }
+
+    #[private]
+    pub fn callback_ft_mint(#[callback_result] res: Result<(), near_sdk::PromiseError>) {
+        if res.is_err() {
+            near_sdk::env::panic_str("failed to call ft_mint");
+        } else {
+            near_sdk::log!("success call ft_mint");
+        }
     }
 
     fn calculate_value(input: u128, action: &CounterAction) -> u128 {
@@ -133,6 +169,14 @@ impl Contract {
             .take(limit.unwrap_or(U128(u128::MAX)).0 as usize)
             .collect()
     }
+}
+
+#[ext_contract(ext_counter_ft)]
+trait CounterFT {
+    fn ft_mint(&self);
+    fn storage_deposit(&mut self,
+        account_id: Option<near_sdk::AccountId>,
+        registration_only: Option<bool>) -> near_contract_standards::storage_management::StorageBalance;
 }
 
 #[cfg(test)]

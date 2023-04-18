@@ -23,12 +23,12 @@ category = "near"
 cwd = "./counter-ft"
 dependencies = ["build"]
 script = '''
-CONTRACT_ACCOUNT_ID=$(cat ../contract/neardev/dev-account)
+# CONTRACT_ACCOUNT_ID=$(cat ../contract/neardev/dev-account)
 
 near dev-deploy \
     --wasmFile ../target/wasm32-unknown-unknown/release/counter_ft.wasm \
     --initFunction new \
-    --initArgs {\"contract_account_id\":\"${CONTRACT_ACCOUNT_ID}\"}
+    --initArgs {}
 '''
 
 [tasks.remove-ft]
@@ -40,8 +40,22 @@ rm neardev -rf
 '''
 
 [tasks.view-contract]
-description = "run a new view method call"
+description = "run a view method call on contract"
 category = "near"
 script = [
     "near view $(cat ./counter-contract/neardev/dev-account) ${@}"
+]
+
+[tasks.call-contract]
+description = "run a call method call on contract"
+category = "near"
+script = [
+    "near call $(cat ./counter-contract/neardev/dev-account) ${@}"
+]
+
+[tasks.view-ft]
+description = "run a view method call on ft"
+category = "near"
+script = [
+    "near view $(cat ./counter-ft/neardev/dev-account) ${@}"
 ]
