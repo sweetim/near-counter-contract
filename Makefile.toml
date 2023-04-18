@@ -1,0 +1,47 @@
+[config]
+default_to_workspace = false
+
+[tasks.build]
+description = "build all contracts"
+category = "near"
+command = "cargo"
+args = ["build-release"]
+
+[tasks.deploy-contract]
+description = "deploy contract to near testnet"
+category = "near"
+cwd = "./counter-contract"
+dependencies = ["build"]
+script = '''
+near dev-deploy \
+    --wasmFile ../target/wasm32-unknown-unknown/release/counter_contract.wasm
+'''
+
+[tasks.deploy-ft]
+description = "deploy ft to near testnet"
+category = "near"
+cwd = "./counter-ft"
+dependencies = ["build"]
+script = '''
+CONTRACT_ACCOUNT_ID=$(cat ../contract/neardev/dev-account)
+
+near dev-deploy \
+    --wasmFile ../target/wasm32-unknown-unknown/release/counter_ft.wasm \
+    --initFunction new \
+    --initArgs {\"contract_account_id\":\"${CONTRACT_ACCOUNT_ID}\"}
+'''
+
+[tasks.remove-ft]
+description = "remove ft neardev accounts"
+category = "near"
+cwd = "./counter-ft"
+script = '''
+rm neardev -rf
+'''
+
+[tasks.view-contract]
+description = "run a new view method call"
+category = "near"
+script = [
+    "near view $(cat ./counter-contract/neardev/dev-account) ${@}"
+]

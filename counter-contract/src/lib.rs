@@ -1,4 +1,4 @@
-use near_sdk::near_bindgen;
+use near_sdk::{near_bindgen, BorshStorageKey};
 use near_sdk::json_types::U128;
 use near_sdk::serde::Serialize;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
@@ -30,11 +30,16 @@ pub struct Contract {
     records: near_sdk::collections::Vector<CounterRecord>,
 }
 
+#[derive(BorshSerialize, BorshStorageKey)]
+enum StorageKey {
+    Records,
+}
+
 impl Default for Contract {
     fn default() -> Self {
         Self {
             value: 0,
-            records: near_sdk::collections::Vector::new(b"r"),
+            records: near_sdk::collections::Vector::new(StorageKey::Records),
         }
     }
 }
