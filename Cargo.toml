@@ -8,5 +8,6 @@ overflow-checks = true
 
 [workspace]
 members = [
-    "counter-contract"
+    "counter-contract",
+    "counter-ft"
 ]
